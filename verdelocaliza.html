@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>VerdeLocaliza - TecnoVerde</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; text-align: center; }
+        header { background: #2e7d32; color: white; padding: 15px; font-size: 24px; font-weight: bold; }
+        #team { font-size: 16px; margin-top: 5px; font-weight: normal; }
+        #motivacion { background: #a5d6a7; color: #1b5e20; padding: 10px; font-size: 18px; font-weight: bold; }
+        #map { height: 500px; margin: 20px auto; width: 90%; border: 2px solid #4caf50; border-radius: 8px; }
+        #login, #adminPanel { margin: 20px; }
+        #advertencia { background: #ffcdd2; color: #b71c1c; padding: 10px; font-size: 14px; font-weight: bold; margin-top: 20px; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <header>
+        VerdeLocaliza 🌍<br>
+        <span id="team">Un proyecto de <b>TecnoVerde</b></span>
+    </header>
+
+    <div id="motivacion">💚 Tu reporte ayuda a mantener limpio nuestro entorno 🌍. ¡Sigue contribuyendo con VerdeLocaliza!</div>
+
+    <div id="login">
+        <h2>Acceso</h2>
+        <p><b>Usuario:</b> Ingrese su Nombre, Apellido y DNI para reportar zonas contaminadas.</p>
+        <p><b>Anfitrión:</b> Ingrese la contraseña para gestionar los reportes.</p>
+        <input id="nombre" placeholder="Nombre"><br><br>
+        <input id="apellido" placeholder="Apellido"><br><br>
+        <input id="dni" placeholder="DNI"><br><br>
+        <input id="password" type="password" placeholder="Contraseña (solo anfitrión)"><br><br>
+        <button onclick="login()">Ingresar</button>
+    </div>
+
+    <div id="mapSection" class="hidden">
+        <h2>Mapa de Reportes - Cañete</h2>
+        <div id="map"></div>
+        <div id="adminPanel" class="hidden">
+            <h3>Panel del Anfitrión</h3>
+            <ul id="reportList"></ul>
+        </div>
+    </div>
+
+    <div id="advertencia">⚠️ Usa esta herramienta con responsabilidad. Los reportes falsos afectan a tu comunidad.</div>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+        let user = null;
+        let reports = JSON.parse(localStorage.getItem('reports')) || [];
+        let map, markers = [];
+
+        function login() {
+            const nombre = document.getElementById('nombre').value.trim();
+            const apellido = document.getElementById('apellido').value.trim();
+            const dni = document.getElementById('dni').value.trim();
+            const password = document.getElementById('password').value.trim();
+
+            if (password === '123') {
+                user = { admin: true };
+                document.getElementById('login').classList.add('hidden');
+                document.getElementById('mapSection').classList.remove('hidden');
+                document.getElementById('adminPanel').classList.remove('hidden');
+                initMap();
+                renderReports();
+            } else if (nombre && apellido && dni) {
+                user = { nombre, apellido, dni, admin: false };
+                document.getElementById('login').classList.add('hidden');
+                document.getElementById('mapSection').classList.remove('hidden');
+                initMap();
+                renderReports();
+            } else {
+                alert('Complete todos los campos para ingresar.');
+            }
+        }
+
+        function initMap() {
+            map = L.map('map').setView([-13.0782, -76.3839], 13); // Cañete
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+
+            if (!user.admin) {
+                map.on('click', function(e) {
+                    const desc = prompt('Describe la zona contaminada:');
+                    if (desc) {
+                        const report = {
+                            id: Date.now(),
+                            lat: e.latlng.lat,
+                            lng: e.latlng.lng,
+                            desc,
+                            user: user.nombre + ' ' + user.apellido + ' (' + user.dni + ')'
+                        };
+                        reports.push(report);
+                        localStorage.setItem('reports', JSON.stringify(reports));
+                        renderReports();
+                    }
+                });
+            }
+        }
+
+        function renderReports() {
+            markers.forEach(m => map.removeLayer(m));
+            markers = [];
+            document.getElementById('reportList').innerHTML = '';
+
+            reports.forEach(r => {
+                const marker = L.marker([r.lat, r.lng], { draggable: false }).addTo(map);
+                marker.bindPopup(`<b>${r.desc}</b><br>Reportado por: ${r.user}`);
+                markers.push(marker);
+
+                if (user.admin) {
+                    const li = document.createElement('li');
+                    li.textContent = r.desc + ' - ' + r.user;
+                    const btn = document.createElement('button');
+                    btn.textContent = 'Eliminar';
+                    btn.onclick = () => deleteReport(r.id);
+                    li.appendChild(btn);
+                    document.getElementById('reportList').appendChild(li);
+                }
+            });
+        }
+
+        function deleteReport(id) {
+            reports = reports.filter(r => r.id !== id);
+            localStorage.setItem('reports', JSON.stringify(reports));
+            renderReports();
+        }
+    </script>
+</body>
+</html>
